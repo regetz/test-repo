@@ -1,0 +1,166 @@
+---
+title: "Intro to Visualization"
+author: "Jim Regetz"
+format: html
+editor: visual
+---
+
+```{r}
+library(readr)
+library(dplyr)
+library(tidyr)
+library(ggplot2)
+library(janitor) # expedite cleaning and exploring data
+library(scales) # scale functions for visualization
+library(leaflet) # interactive maps
+library(DT) # interactive tables
+```
+
+## Let's get some data!
+
+```{r}
+escape_raw <- read_csv("https://knb.ecoinformatics.org/knb/d1/mn/v2/object/urn%3Auuid%3Af119a05b-bbe7-4aea-93c6-85434dcb1c5e")
+
+### backup plan!
+# escape_raw <- read_csv("data/ADFG_firstAttempt_reformatted.csv")
+```
+
+## What did we get?
+
+```{r}
+## Check out column names
+colnames(escape_raw)
+```
+
+```{r}
+## Peak at each column and class
+escape_raw %>% head(1) %>% glimpse()
+```
+
+```{r}
+## From when to when
+range(escape_raw$sampleDate)
+```
+
+```{r}
+## Which species?
+unique(escape_raw$Species)
+```
+
+## Time to clean the data!
+
+```{r}
+escape <- escape_raw %>% 
+    janitor::clean_names()
+```
+
+```{r}
+figure_data <- escape %>%
+  filter(sasap_region == "Kodiak",
+           "1950-07-26" <= sample_date,
+           sample_date <= "1950-07-30",
+           0 < daily_count,
+           species %in% c("Pink", "Sockeye"))
+figure_data %>%
+  select(sample_date, location, species, daily_count) %>%
+  knitr::kable() %>%
+  kableExtra::kable_styling()
+figure_data %>%
+  ggplot +
+    geom_point(aes(sample_date, daily_count, colour=species, shape=location),
+               size=3) +
+    scale_x_date("Sample date") +
+    scale_y_log10("Daily count", label=scales::comma) +
+    scale_shape_discrete("Location") +
+    scale_color_discrete("Species") +
+    theme_light()
+```
+
+## Quick data summarization
+
+```{r}
+annual_esc <- escape %>%
+    mutate(year = lubridate::year(sample_date)) %>%
+    group_by(species, sasap_region, year) %>%
+    summarize(escapement = sum(daily_count), .groups="drop") %>%
+    filter(species %in% c("Chinook", "Sockeye", "Chum", "Coho", "Pink"))
+
+head(annual_esc)
+```
+
+## Let's visualize!
+
+```{r}
+annual_esc %>% filter(species=="Chinook") %>%
+  ggplot() +
+    geom_line(aes(year, escapement, color=sasap_region)) 
+```
+
+```{r}
+annual_esc %>% mutate(log_escapement = log10(escapement))
+```
+
+```{r}
+annual_esc %>% mutate(log_escapement = log10(escapement)) %>%
+  ggplot() +
+    geom_density(aes(log_escapement, fill=species)) +
+    facet_wrap(~species, scales="free")
+```
+
+```{r}
+annual_esc %>%
+  ggplot() +
+    geom_density(aes(escapement, fill=species)) +
+    facet_wrap(~species, scales="free") +
+    scale_x_log10()
+```
+
+### Monthly patterns
+
+```{r}
+monthly_esc <- escape %>%
+    group_by(species,
+             sasap_region,
+             month = lubridate::month(sample_date)) %>%
+    summarize(escapement = sum(daily_count), .groups="drop") %>%
+    filter(species %in% c("Chinook", "Sockeye", "Chum", "Coho", "Pink"))
+
+head(monthly_esc)
+```
+
+```{r}
+monthly_esc %>%
+  ggplot(aes(ordered(month), escapement)) +
+    geom_col(aes(fill=species))
+```
+
+### Interactive fun
+
+```{r}
+library(leaflet)
+locations <- escape %>%
+    distinct(location, latitude, longitude) %>%
+    drop_na()
+
+leaflet(locations) %>%
+    addWMSTiles(
+        "https://www.gebco.net/data_and_products/gebco_web_services/web_map_service/mapserv?request=getmap&service=wms&BBOX=-90,-180,90,360&crs=EPSG:4326&format=image/jpeg&layers=gebco_latest&width=1200&height=600&version=1.3.0",
+        layers = 'GEBCO_LATEST',
+        attribution = "Imagery reproduced from the GEBCO_2022 Grid, WMS 1.3.0 GetMap, www.gebco.net"
+    ) %>%
+    addCircleMarkers(
+        lng = ~ longitude,
+        lat = ~ latitude,
+        popup = ~ location,
+        radius = 5,
+        # set fill properties
+        fillColor = "salmon",
+        fillOpacity = 1,
+        # set stroke properties
+        stroke = TRUE,
+        weight = 0.5,
+        color = "white",
+        opacity = 1
+    )
+```
+

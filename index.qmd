@@ -1,16 +1,21 @@
 ---
-title: "GitHub Pages Example"
+title: "Reproducible Approaches to Arctic Research"
+author: Arctic Awesomeness
+date: 2025-02-26
 format: html
+theme: sandstone
 ---
 
 ## Course Lessons
 
+- Introduction to the Arctic Data Center
 - [Introduction to Quarto](quarto-intro.html)
-- Introduction to get and GitHub
-- Cleaning and Wrangling data
+- Data Management Plans
+- Introduction to git and GitHub
+- [Introduction to Visualization](intro-visualization-full.html)
 
 ## Course Practice Sessions
 
-- Practice I
-- Practice II
-- Practice III
+- Cleaning and Wrangling data
+- Writing Function and Packages
+- Working with Spatial Data
